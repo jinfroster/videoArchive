@@ -1,0 +1,63 @@
+BODY {
+ font-family: Verdana, Helvetica, sans-serif;
+ font-size: 90%;
+ background: black;
+ color: white;
+}
+
+.global {
+	display: flex; 
+}
+
+.camList {
+	padding: 10px;
+}
+
+.camList OL {
+	margin: 0;
+}
+
+.camList UL {
+	margin: 0;
+}
+
+.camList LI {
+	cursor: pointer;
+}
+
+.watchLast {
+	padding: 10px;
+	flex-grow: 3;
+	display: flex; 
+	flex-wrap: wrap;
+}
+.watchLast IMG {
+	max-width:100%;
+}
+
+.watchDay {
+	padding: 10px;
+	flex-grow: 3;
+}
+
+.timeline {
+	width: min-content;
+	border: 1px solid gray;
+}
+
+.timeline CANVAS {
+	margin: 2px;
+	cursor: crosshair;
+}
+
+.archivePhoto {
+	display: flex; 
+}
+
+.archivePhoto IMG {
+	max-width:100%;
+}
+
+.archivePhoto VIDEO {
+	max-width:100%;
+}

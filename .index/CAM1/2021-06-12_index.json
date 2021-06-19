@@ -1,0 +1,25 @@
+[
+  {"type":"directory","name":"CAM1/./2021-06-12","contents":[
+    {"type":"directory","name":"001","contents":[
+      {"type":"directory","name":"dav","contents":[
+        {"type":"directory","name":"19","contents":[
+          {"type":"file","name":"19.14.00-19.14.17[M][0@0][0].mp4"}
+        ]}
+      ]},
+      {"type":"directory","name":"jpg","contents":[
+        {"type":"directory","name":"05","contents":[
+          {"type":"directory","name":"00","contents":[
+            {"type":"file","name":"28[R][0@0][0].jpg"},
+            {"type":"file","name":"58[R][0@0][0].jpg"}
+          ]}
+        ]},
+        {"type":"directory","name":"19","contents":[
+          {"type":"directory","name":"59","contents":[
+            {"type":"file","name":"13[R][0@0][0].jpg"},
+            {"type":"file","name":"44[R][0@0][0].jpg"}
+          ]}
+        ]}
+      ]}
+    ]}
+  ]}
+]

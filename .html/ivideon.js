@@ -9,12 +9,12 @@ var gTimelineMouseOverEnabled = true;
 
 Object.size = function(arr) 
 {
-    var size = 0;
-    for (var key in arr) 
-    {
-        if (arr.hasOwnProperty(key)) size++;
-    }
-    return size;
+	var size = 0;
+	for (var key in arr) 
+	{
+		if (arr.hasOwnProperty(key)) size++;
+	}
+	return size;
 };
 
 
@@ -29,24 +29,24 @@ function loadGlobalIndex() {
 	fetch(".index/index.json")
 		.then(res => res.json())
 		.then((out) => {
-	  		//console.log('Checkout this JSON! ', out);
-	  		gCamList={};
-	  		out.forEach((o,i) => {
-	  			if (o.type="directory") {
-	  				lCamName=o.name.slice(0,-1);
-	  				gCamList[lCamName] = {}
-	  				gCamList[lCamName].dates = [];
-	  				o.contents.forEach((d,i) => {
-	  					if (d.type="directory") {
-	  						gCamList[lCamName].dates.push(d.name);
-	  					}
-	  				})
-	  			}
-	  		})
-	  		//gCamList = out
-	  		console.log(gCamList);
-	  		refreshCamList();
-	  		showLast();
+			//console.log('Checkout this JSON! ', out);
+			gCamList={};
+			out.forEach((o,i) => {
+				if (o.type="directory") {
+					lCamName=o.name.slice(0,-1);
+					gCamList[lCamName] = {}
+					gCamList[lCamName].dates = [];
+					o.contents.forEach((d,i) => {
+						if (d.type="directory") {
+							gCamList[lCamName].dates.push(d.name);
+						}
+					})
+				}
+			})
+			//gCamList = out
+			console.log(gCamList);
+			refreshCamList();
+			showLast();
 		})
 		.catch(err => { throw err });	
 }
@@ -73,7 +73,8 @@ function refreshCamList() {
 		camListHtml += "<li onclick='showLast(\""+cam+"\")'>"+cam+"</li>";
 		dates.push(...gCamList[cam].dates);
 	};
-	dates = [...new Set(dates)];
+	dates = [...new Set(dates.sort())];
+	console.log('refreshCamList dates set=',dates)
 	camListHtml += "</ol>Archive ("+dates.length+")<ul>";
 	dates.reverse().forEach((d, i) => {
 		camListHtml += "<li onClick='loadDateIndex(\""+d+"\")'>"+d+"</li>"
@@ -100,55 +101,61 @@ function loadCamDateIndex(pCam, pDate) {
 	fetch(".index/"+pCam+"/"+pDate+"_index.json")
 		.then(response => response.json())
 		.then(function(data) {
-	  		//console.log('Got index.json for '+pCam, data);
-	  		data = data[0].contents[0].contents; // skip root and 001 folders
-	  		gArchivePhotoUrl[pCam]={};
-	  		gArchiveVideoUrl[pCam]={};
-	  		gArchiveVideoLength[pCam]={};
-	  		data.forEach((o,i) => {
-	  			if (o.type=="directory" && o.name=="dav") {
-	  				o.contents.forEach((hho,i) => {
-	  					if (hho.type=="directory") {
-	  						hho.contents.forEach((fo,i)=> {
-	  							if (fo.type=="file" && fo.name.slice(-4)==".mp4") {
-	  								var mi = parseInt(fo.name.slice(3,5));
-	  								var ss = parseInt(fo.name.slice(6,8));
-	  								var ts1 = parseInt(hho.name)*3600 + mi*60 + ss;
-	  								gArchiveVideoUrl[pCam][ts1] = pCam+"/"+pDate+"/001/dav/"+hho.name+"/"+fo.name;
+			//console.log('Got index.json for '+pCam, data);
+			data = data[0].contents[0].contents; // skip root and 001 folders
+			gArchivePhotoUrl[pCam]={};
+			gArchiveVideoUrl[pCam]={};
+			gArchiveVideoLength[pCam]={};
+			data.forEach((o,i) => {
+				if (o.type=="directory" && o.name=="dav") {
+					o.contents.forEach((hho,i) => {
+						if (hho.type=="directory") {
+							hho.contents.forEach((fo,i)=> {
+								if (fo.type=="file" && fo.name.slice(-4)==".mp4") {
+									var mi = parseInt(fo.name.slice(3,5));
+									var ss = parseInt(fo.name.slice(6,8));
+									var ts1 = parseInt(hho.name)*3600 + mi*60 + ss;
+									gArchiveVideoUrl[pCam][ts1] = pCam+"/"+pDate+"/001/dav/"+hho.name+"/"+fo.name;
 
-	  								var hh = parseInt(fo.name.slice(9,11));
-	  								mi = parseInt(fo.name.slice(12,14));
-	  								ss = parseInt(fo.name.slice(15,17));
-	  								var ts2 = hh*3600 + mi*60 + ss;
-	  								if (ts2<ts1) {
-	  									ts2 = 86399;
-	  								}
-	  								gArchiveVideoLength[pCam][ts1] = (ts2-ts1);
-	  							}
-	  						});
-	  					}
-	  				});
-	  			} else if (o.name="jpg") {
-	  				o.contents.forEach((hho,i) => {
-	  					if (hho.type=="directory") {
-	  						hho.contents.forEach((mio,i)=> {
-		  						if (mio.type=="directory") {
-		  							mio.contents.forEach((fo,i)=> {
-			  							if (fo.type=="file" && fo.name.slice(-4)==".jpg") {
-			  								var ss = parseInt(fo.name,0,2);
-	  										var ts = parseInt(hho.name)*3600 + parseInt(mio.name)*60 + ss;
-			  								gArchivePhotoUrl[pCam][ts] = pCam+"/"+pDate+"/001/jpg/"+hho.name+"/"+mio.name+"/"+fo.name;
-			  							}
-			  						})
-		  						}
-		  					})
-	  					}
-	  				})
-	  			}
-	  		})
-	  		drawTimeline(pCam);
+									var hh = parseInt(fo.name.slice(9,11));
+									mi = parseInt(fo.name.slice(12,14));
+									ss = parseInt(fo.name.slice(15,17));
+									var ts2 = hh*3600 + mi*60 + ss;
+									if (ts2<ts1) {
+										ts2 = 86399;
+									}
+									gArchiveVideoLength[pCam][ts1] = (ts2-ts1);
+								}
+							});
+						}
+					});
+				} else if (o.name="jpg") {
+					o.contents.forEach((hho,i) => {
+						if (hho.type=="directory") {
+							hho.contents.forEach((mio,i)=> {
+								if (mio.type=="directory") {
+									mio.contents.forEach((fo,i)=> {
+										if (fo.type=="file" && fo.name.slice(-4)==".jpg") {
+											var ss = parseInt(fo.name,0,2);
+											var ts = parseInt(hho.name)*3600 + parseInt(mio.name)*60 + ss;
+											gArchivePhotoUrl[pCam][ts] = pCam+"/"+pDate+"/001/jpg/"+hho.name+"/"+mio.name+"/"+fo.name;
+										}
+									})
+								}
+							})
+						}
+					})
+				}
+			})
+			drawTimeline(pCam);
 		})
-		.catch(err => { throw err });	
+		.catch(err => {
+			gArchivePhotoUrl[pCam]={};
+			gArchiveVideoUrl[pCam]={};
+			gArchiveVideoLength[pCam]={};
+			drawTimeline(pCam);
+			throw err;
+		});	
 
 }
 

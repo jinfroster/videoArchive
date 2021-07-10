@@ -6,6 +6,13 @@ var gArchiveVideoTimeMapping = [];
 var gArchivePhotoUrl = {};
 var gArchivePhotoTimeMapping = [];
 var gTimelineMouseOverEnabled = true;
+var gCurrentCam = null;
+var gCurrentMode = null; // 'video'/'photo'
+var gCurrentTimestamp = null;
+
+const TIMESTAMPS_COUNT = 86400;
+const MIN_TIMESTAMP = 0;
+const MAX_TIMESTAMP = TIMESTAMPS_COUNT - 1;
 
 Object.size = function(arr) 
 {
@@ -19,13 +26,13 @@ Object.size = function(arr)
 
 
 function appInit() {
-	console.log("appInit");
+	// console.log("appInit");
 	loadGlobalIndex();
 	//refreshCamList();
 }
 
 function loadGlobalIndex() {
-	console.log("loadGlobalIndex");
+	// console.log("loadGlobalIndex");
 	fetch(".index/index.json")
 		.then(res => res.json())
 		.then((out) => {
@@ -44,7 +51,7 @@ function loadGlobalIndex() {
 				}
 			})
 			//gCamList = out
-			console.log(gCamList);
+			// console.log(gCamList);
 			refreshCamList();
 			showLast();
 		})
@@ -74,7 +81,7 @@ function refreshCamList() {
 		dates.push(...gCamList[cam].dates);
 	};
 	dates = [...new Set(dates.sort())];
-	console.log('refreshCamList dates set=',dates)
+	// console.log('refreshCamList dates set=',dates)
 	camListHtml += "</ol>Archive ("+dates.length+")<ul>";
 	dates.reverse().forEach((d, i) => {
 		camListHtml += "<li onClick='loadDateIndex(\""+d+"\")'>"+d+"</li>"
@@ -122,7 +129,7 @@ function loadCamDateIndex(pCam, pDate) {
 									ss = parseInt(fo.name.slice(15,17));
 									var ts2 = hh*3600 + mi*60 + ss;
 									if (ts2<ts1) {
-										ts2 = 86399;
+										ts2 = MAX_TIMESTAMP;
 									}
 									gArchiveVideoLength[pCam][ts1] = (ts2-ts1);
 								}
@@ -166,7 +173,7 @@ function drawTimeline(pCam) {
 	if (divWatchDay.innerHTML == "") {
 		var html = '<div id="timelines" class="timeline">';
 		for (var cam in gCamList) {
-			html += '<canvas id="timeline-'+cam+'" width=1080 height=20 onmousemove="showPhoto(\''+cam+'\',event)" onclick="showVideo(\''+cam+'\',event)"></canvas>';
+			html += '<canvas id="timeline-'+cam+'" width=1080 height=20 onmousemove="onTimelineSeek(\''+cam+'\',event)" onclick="onTimelineClick(\''+cam+'\',event)"></canvas>';
 		}
 		html += '</div>'+
 			'<div id="archiveTime"></div>'+
@@ -182,16 +189,16 @@ function drawTimeline(pCam) {
 	gArchivePhotoTimeMapping[pCam]=[];
 	ctx.fillStyle = 'green';
 	for (var i in gArchivePhotoUrl[pCam]) {
-		var x = Math.floor(i*1080/86400);
+		var x = Math.floor(i*1080/TIMESTAMPS_COUNT);
 		ctx.fillRect(x,0,1,20);
 		gArchivePhotoTimeMapping[pCam][x]=i;
 	}
 
 	gArchiveVideoTimeMapping[pCam]=[];
-	ctx.fillStyle = 'yellow';
+	ctx.fillStyle = 'red';
 	for (var i in gArchiveVideoUrl[pCam]) {
-		var x = Math.floor(i*1080/86400);
-		var dx = Math.ceil(gArchiveVideoLength[pCam][i]*1080/86400);
+		var x = Math.floor(i*1080/TIMESTAMPS_COUNT);
+		var dx = Math.ceil(gArchiveVideoLength[pCam][i]*1080/TIMESTAMPS_COUNT);
 		var x2 = x + dx;
 		ctx.fillRect(x,0,dx,20);
 		for(; x<x2; x++) {
@@ -207,64 +214,85 @@ function idx2time(pIdx) {
 	return hh+":"+mi+":"+ss;
 }
 
-function showPhoto(pCam, pEvent) {
+
+function onTimelineSeek(pCam, pEvent) {
 	if (! gTimelineMouseOverEnabled) return;
 	var cvs = document.getElementById("timeline-"+pCam);
 	if (cvs == null) return;
 
 	var x = pEvent.x - cvs.offsetLeft;
-	var idx1 = Math.floor(x*86400/1080);
+	var idx1 = Math.floor(x*TIMESTAMPS_COUNT/1080);
 	var idx2 = idx1 + 79; // в 1 пиксел помещается 80 секунд
 	var time = gArchiveDate + " " + idx2time(idx1)+"-"+idx2time(idx2);
 	var divTime = document.getElementById("archiveTime");
 	if (divTime != null) {
-		divTime.innerHTML = time;
+		divTime.innerHTML = '<a class="textButton" onClick="showPrev()">⬅️</a><a class="textButton" onClick="showNext()">➡️</a> ' + time;
 	}
-	
+	var ts = gArchivePhotoTimeMapping[pCam][x];
+	// console.log("onTimelineSeek pCam="+pCam+" pEvent.x="+pEvent.x+" cvs.offsetLeft="+cvs.offsetLeft+" x="+x+" idx1="+idx1+" idx2="+idx2+" time="+time+" ts="+ts);
+	showPhoto(pCam, ts);
+}
+
+
+function showPhoto(pCam, pTimestamp) {
 	var url;
-	var arcKey = gArchivePhotoTimeMapping[pCam][x];
-	if (arcKey != undefined) {
-		url = gArchivePhotoUrl[pCam][arcKey];
+	if (pTimestamp != undefined) {
+		url = gArchivePhotoUrl[pCam][pTimestamp];
 	}
+
+	var imgArchiveVideo = document.getElementById("archiveVideo");
+	if (imgArchiveVideo != null) {
+		if (url != undefined || imgArchiveVideo.ended) {
+			imgArchiveVideo.style.display = 'none';
+		}
+		if (url != undefined) { // а иначе пусть продолжается воспроизведение текущего видео
+			imgArchiveVideo.pause();
+		}
+	}
+
 	if (url != undefined) {
 		var imgArchivePhoto = document.getElementById("archivePhoto");
 		if (imgArchivePhoto != null) {
 				imgArchivePhoto.style.display = 'block';
 				imgArchivePhoto.src = url;
 		}
+		gCurrentMode = 'photo';
+		gCurrentCam = pCam;
+		gCurrentTimestamp = pTimestamp;
 	}
-	var imgArchiveVideo = document.getElementById("archiveVideo");
-	if (imgArchiveVideo != null) {
-			imgArchiveVideo.pause();
-			imgArchiveVideo.style.display = 'none';
-	}
-	//console.log("showPhoto pCam="+pCam+" pEvent.x="+pEvent.x+" cvs.offsetLeft="+cvs.offsetLeft+" x="+x+" idx1="+idx1+" idx2="+idx2+" time="+time+" arcKey="+arcKey+" url="+url);
+	// console.log("showPhoto pCam="+pCam+" pTimestamp="+pTimestamp+" url="+url);
 }
 
-function showVideo(pCam, pEvent) {
+
+function onTimelineClick(pCam, pEvent) {
 	var cvs = document.getElementById("timeline-"+pCam);
 	if (cvs == null) return;
 
 	var x = pEvent.x - cvs.offsetLeft;
-	var arcKey;
-	var url;
+	var ts;
 
+	// console.log("onTimelineClick pCam="+pCam+" pEvent.x="+pEvent.x+" cvs.offsetLeft="+cvs.offsetLeft+" x="+x);
 	// ищем сначала в точке, затем расходимся в стороны +- 2px. Когда вокруг нет других видео, так проще попадать
 	for (var i=0; i<3; i++) {
-		arcKey = gArchiveVideoTimeMapping[pCam][x+i];
-		if (arcKey != undefined) {
-			url = gArchiveVideoUrl[pCam][arcKey];
+		ts = gArchiveVideoTimeMapping[pCam][x+i];
+		if (ts != undefined) {
 			//console.log(" found @ i="+i+" idx="+(x+i))
+			showVideo(pCam, ts);
 			break;
 		}
-		arcKey = gArchiveVideoTimeMapping[pCam][x-i];
-		if (arcKey != undefined) {
-			url = gArchiveVideoUrl[pCam][arcKey];
+		ts = gArchiveVideoTimeMapping[pCam][x-i];
+		if (ts != undefined) {
 			//console.log(" found @ i="+(-i)+" idx="+(x-i))
+			showVideo(pCam, ts);
 			break;
 		}
 	}
+}
+
 	
+function showVideo(pCam, pTimestamp) {
+	var url;
+	url = gArchiveVideoUrl[pCam][pTimestamp];
 	if (url != undefined) {
 		var imgArchiveVideo = document.getElementById("archiveVideo");
 		if (imgArchiveVideo != null) {
@@ -280,6 +308,58 @@ function showVideo(pCam, pEvent) {
 						imgArchivePhoto.style.display = 'none';
 				}				
 		}
+		gCurrentMode = 'video';
+		gCurrentCam = pCam;
+		gCurrentTimestamp = pTimestamp;
 	}
-	//console.log("showVideo pCam="+pCam+" pEvent.x="+pEvent.x+" cvs.offsetLeft="+cvs.offsetLeft+" x="+x+" arcKey="+arcKey+" url="+url);
+	// console.log("showVideo pCam="+pCam+" pTimestamp="+pTimestamp+" url="+url);
+}
+
+
+function showPrev() {
+	// console.log("showPrev gCurrentMode="+gCurrentMode+" gCurrentCam="+gCurrentCam+" gCurrentTimestamp="+gCurrentTimestamp);
+	var ts = gCurrentTimestamp;
+	ts--;
+	if (gCurrentMode == 'photo') {
+		while(ts >= MIN_TIMESTAMP) {
+			if (gArchivePhotoUrl[gCurrentCam][ts] != undefined) {
+				showPhoto(gCurrentCam, ts);
+				break;
+			}
+			ts--;
+		}
+	} else if (gCurrentMode == 'video') {
+		while(ts >= MIN_TIMESTAMP) {
+			if (gArchiveVideoUrl[gCurrentCam][ts] != undefined) {
+				showVideo(gCurrentCam, ts);
+				break;
+			}
+			ts--;
+		}
+	}
+}
+
+
+
+function showNext() {
+	// console.log("showNext gCurrentMode="+gCurrentMode+" gCurrentCam="+gCurrentCam+" gCurrentTimestamp="+gCurrentTimestamp);
+	var ts = gCurrentTimestamp;
+	ts++;
+	if (gCurrentMode == 'photo') {
+		while(ts <= MAX_TIMESTAMP) {
+			if (gArchivePhotoUrl[gCurrentCam][ts] != undefined) {
+				showPhoto(gCurrentCam, ts);
+				break;
+			}
+			ts++;
+		}
+	} else if (gCurrentMode == 'video') {
+		while(ts <= MAX_TIMESTAMP) {
+			if (gArchiveVideoUrl[gCurrentCam][ts] != undefined) {
+				showVideo(gCurrentCam, ts);
+				break;
+			}
+			ts++;
+		}
+	}
 }

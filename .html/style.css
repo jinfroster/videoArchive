@@ -19,11 +19,45 @@ BODY {
 
 .camList UL {
 	margin: 0;
+	padding-left: 10px;
 }
 
 .camList LI {
 	cursor: pointer;
 }
+
+.collapsible.collapsed * {
+	/*background-color: red;*/
+	display: none;
+}
+
+.archiveTimeBar {
+	display: flex;
+	flex-direction: row;
+  	align-items: center;
+}
+
+.toolButton {
+	margin: 2px;
+	padding: 0px 2px 0px 2px;
+	border: 1px solid gray;
+	border-radius: 3px;
+	background-color: #265980;
+	cursor: pointer;
+	font-size: 9pt;
+}
+
+.toolButtonLarge {
+	font-size: 12pt;
+}
+
+.controlOff {
+	background-color: #265980;
+}
+.controlOn {
+	background-color: red;
+}
+
 
 .watchLast {
 	padding: 10px;
@@ -46,7 +80,7 @@ BODY {
 }
 
 .timeline CANVAS {
-	margin: 2px;
+	margin: 1px 1px 0px 1px;
 	cursor: crosshair;
 }
 

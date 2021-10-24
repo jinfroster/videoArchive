@@ -2,6 +2,7 @@ var gCamList = {};
 var gArchiveDate = null;
 var gArchiveVideoUrl = {};
 var gArchiveVideoLength = [];
+var gArchiveVideoImportance = [];
 var gArchiveVideoTimeMapping = [];
 var gArchivePhotoUrl = {};
 var gArchivePhotoTimeMapping = [];
@@ -9,6 +10,8 @@ var gTimelineMouseOverEnabled = true;
 var gCurrentCam = null;
 var gCurrentMode = null; // 'video'/'photo'
 var gCurrentTimestamp = null;
+var gVideoSpeed = 1;
+var gNeedControl = false;
 
 const TIMESTAMPS_COUNT = 86400;
 const MIN_TIMESTAMP = 0;
@@ -29,62 +32,112 @@ function appInit() {
 	// console.log("appInit");
 	loadGlobalIndex();
 	//refreshCamList();
+	//alert("05.10.2021\n* Теперь поиск по таймлайну делается с зажатым Ctrl\n* Добавлена кнопка скорости воспроизведения");
 }
-
 function loadGlobalIndex() {
-	// console.log("loadGlobalIndex");
+	//console.log("loadGlobalIndex");
 	fetch(".index/index.json")
 		.then(res => res.json())
 		.then((out) => {
 			//console.log('Checkout this JSON! ', out);
 			gCamList={};
 			out.forEach((o,i) => {
-				if (o.type="directory") {
+				if (o.type=="directory") {
 					lCamName=o.name.slice(0,-1);
 					gCamList[lCamName] = {}
 					gCamList[lCamName].dates = [];
 					o.contents.forEach((d,i) => {
-						if (d.type="directory") {
+						if (d.type=="directory" || d.type=="link") {
 							gCamList[lCamName].dates.push(d.name);
 						}
 					})
 				}
 			})
-			//gCamList = out
+			appInit2();
 			// console.log(gCamList);
-			refreshCamList();
-			showLast();
+			//showLast();
 		})
 		.catch(err => { throw err });	
 }
-
-function showLast(pCam=null) {
-	var camPreviewHtml = "";
-	document.getElementById("watchDay").innerHTML = ""
-	document.getElementById("watchLast").innerHTML = "loading...";
-	if (pCam == null) {
-		for (var cam in gCamList) {
-			camPreviewHtml += "<div><h3>"+cam+"</h3><img src='.index/"+cam+"/last.jpg#" + new Date().getTime() + "'/></div>";
-		}
-	} else {
-		camPreviewHtml += "<div><h3>"+pCam+"</h3><img src='.index/"+pCam+"/last.jpg#" + new Date().getTime() + "'/></div>";
+function appInit2() {
+	refreshCamList();
+	getUrlParams();
+	if (gArchiveDate != null) {
+		loadDateIndex(gArchiveDate);
 	}
-	document.getElementById("watchLast").innerHTML = camPreviewHtml;
+}
+
+
+function getUrlParams() {
+	sp = new URL(document.URL).searchParams;
+	gArchiveDate = sp.get("date");
+	gCurrentCam  = sp.get("cam");
+	gCurrentMode  = sp.get("mode");
+	gCurrentTimestamp = sp.get("ts");
+}
+function setUrlParams() {
+	u = new URL(document.URL);
+	u.searchParams.set("date", gArchiveDate);
+	u.searchParams.set("cam",  gCurrentCam);
+	u.searchParams.set("mode", gCurrentMode);
+	u.searchParams.set("ts",gCurrentTimestamp);
+	history.replaceState(null, window.title, u.href);
+}
+
+
+
+// function showLast(pCam=null) {
+// 	var camPreviewHtml = "";
+// 	document.getElementById("watchDay").innerHTML = ""
+// 	document.getElementById("watchLast").innerHTML = "loading...";
+// 	if (pCam == null) {
+// 		for (var cam in gCamList) {
+// 			camPreviewHtml += "<div><h3>"+cam+"</h3><img src='.index/"+cam+"/last.jpg#" + new Date().getTime() + "'/></div>";
+// 		}
+// 	} else {
+// 		camPreviewHtml += "<div><h3>"+pCam+"</h3><img src='.index/"+pCam+"/last.jpg#" + new Date().getTime() + "'/></div>";
+// 	}
+// 	document.getElementById("watchLast").innerHTML = camPreviewHtml;
+// }
+
+function toggleCollapsible(event, elem) {
+	elem.classList.toggle("collapsed");
+	event.stopPropagation();
 }
 
 function refreshCamList() {
 	//console.log("refreshCamList");
-	var camListHtml = "<a onClick='javascript:showLast()'>Last ("+Object.size(gCamList)+")</a><ol>";
+	//<a href='https://my.ivideon.com/cameras/devices' target='ivideon_online'>Online</a><br/>
+	// var camListHtml; // = "<a onClick='javascript:showLast()'>Last ("+Object.size(gCamList)+")</a><ol>";
 	var dates=[];
 	for (var cam in gCamList) {
-		camListHtml += "<li onclick='showLast(\""+cam+"\")'>"+cam+"</li>";
+		//camListHtml += "<li onclick='showLast(\""+cam+"\")'>"+cam+"</li>";
 		dates.push(...gCamList[cam].dates);
 	};
 	dates = [...new Set(dates.sort())];
+	prevYear = null;
+	prevMonth = null;
+	collapseLater = "";
 	// console.log('refreshCamList dates set=',dates)
-	camListHtml += "</ol>Archive ("+dates.length+")<ul>";
+	camListHtml = "<ul class='years'>";
 	dates.reverse().forEach((d, i) => {
-		camListHtml += "<li onClick='loadDateIndex(\""+d+"\")'>"+d+"</li>"
+		var [year,month,day] = d.split('-');
+		if (prevYear != year) {
+			if (prevYear != null) {
+				camListHtml += "</li>";
+			}
+			camListHtml += "<li class='collapsible year "+collapseLater+"' onClick='toggleCollapsible(event,this);'>"+year+"<ul class='months'>";
+			prevYear = year;
+		}
+		if (prevMonth != month) {
+			if (prevMonth != null) {
+				camListHtml += "</ul></li>";
+			}
+			camListHtml += "<li class='collapsible month "+collapseLater+"' onClick='toggleCollapsible(event,this);'>"+year+"-"+month+"<ul class='days'>";
+			prevMonth = month;
+		}
+		camListHtml += "<li class='day' onClick='loadDateIndex(\""+d+"\"); event.stopPropagation();'>"+d+"</li>"
+		collapseLater = "collapsed";
 	});
 	camListHtml += "</ul>";
 	document.getElementById("camList").innerHTML = camListHtml;
@@ -101,6 +154,7 @@ function loadDateIndex(pDate) {
 		loadCamDateIndex(cam, pDate);
 	}
 	gArchiveDate = pDate;
+	setUrlParams();
 }
 
 function loadCamDateIndex(pCam, pDate) {
@@ -113,6 +167,7 @@ function loadCamDateIndex(pCam, pDate) {
 			gArchivePhotoUrl[pCam]={};
 			gArchiveVideoUrl[pCam]={};
 			gArchiveVideoLength[pCam]={};
+			gArchiveVideoImportance[pCam]={};
 			data.forEach((o,i) => {
 				if (o.type=="directory" && o.name=="dav") {
 					o.contents.forEach((hho,i) => {
@@ -132,7 +187,18 @@ function loadCamDateIndex(pCam, pDate) {
 										ts2 = MAX_TIMESTAMP;
 									}
 									gArchiveVideoLength[pCam][ts1] = (ts2-ts1);
+
+									if (fo.time=="Dec 31  2099") {
+										gArchiveVideoImportance[pCam][ts1] = true;
+									}
 								}
+								if (fo.type=="file" && fo.name.slice(-4)==".jpg") {
+									var mi = parseInt(fo.name.slice(3,5));
+									var ss = parseInt(fo.name.slice(6,8));
+									var ts1 = parseInt(hho.name)*3600 + mi*60 + ss;
+									gArchivePhotoUrl[pCam][ts1] = pCam+"/"+pDate+"/001/dav/"+hho.name+"/"+fo.name;
+								}
+
 							});
 						}
 					});
@@ -155,11 +221,19 @@ function loadCamDateIndex(pCam, pDate) {
 				}
 			})
 			drawTimeline(pCam);
+			if (pCam == gCurrentCam && gCurrentTimestamp != null) {
+				if (gCurrentMode == "video") {
+					showVideo(gCurrentCam, gCurrentTimestamp);
+				} else if (gCurrentMode == "photo") {
+					showPhoto(gCurrentCam, gCurrentTimestamp);
+				}
+			}
 		})
 		.catch(err => {
 			gArchivePhotoUrl[pCam]={};
 			gArchiveVideoUrl[pCam]={};
 			gArchiveVideoLength[pCam]={};
+			gArchiveVideoImportance[pCam]={};
 			drawTimeline(pCam);
 			throw err;
 		});	
@@ -168,15 +242,21 @@ function loadCamDateIndex(pCam, pDate) {
 
 function drawTimeline(pCam) {
 	//console.log("drawTimeline pCam="+pCam);
-	document.getElementById("watchLast").innerHTML = ""
+	//document.getElementById("watchLast").innerHTML = ""
 	var divWatchDay = document.getElementById("watchDay");
 	if (divWatchDay.innerHTML == "") {
-		var html = '<div id="timelines" class="timeline">';
+		var html = '<div id="timelines" class="timeline"><canvas id="timelineMark" width=1080 height=4></canvas>';
 		for (var cam in gCamList) {
 			html += '<canvas id="timeline-'+cam+'" width=1080 height=20 onmousemove="onTimelineSeek(\''+cam+'\',event)" onclick="onTimelineClick(\''+cam+'\',event)"></canvas>';
 		}
 		html += '</div>'+
-			'<div id="archiveTime"></div>'+
+			'<div class="archiveTimeBar">'+
+			  '<div class="toolButton controlOff" id="toolButtonControl" onClick="toggleControl()">ctrl</div>' +
+			  '<div class="toolButton" id="toolButtonSpeed" onClick="toggleVideoSpeed()">x' + gVideoSpeed + '</div>' +
+			  '<div class="toolButton toolButtonLarge" onClick="showPrev()">⬅️</div>' + 
+			  '<div class="toolButton toolButtonLarge" onClick="showNext()">➡️</div>' +
+			  '<div id="archiveTimeLabel"></div>' +
+			'</div>'+
 			'<div class="archivePhoto"><img id="archivePhoto"/></div>' + 
 			'<div class="archiveVideo"><video id="archiveVideo" width="100%" controls>Ваш браузер не поддерживает воспроизведение видео</video></div>';
 		divWatchDay.innerHTML = html;
@@ -187,7 +267,7 @@ function drawTimeline(pCam) {
 	ctx.clearRect(0,0,1080,20);
 
 	gArchivePhotoTimeMapping[pCam]=[];
-	ctx.fillStyle = 'green';
+	ctx.fillStyle = '#69c469'; // green
 	for (var i in gArchivePhotoUrl[pCam]) {
 		var x = Math.floor(i*1080/TIMESTAMPS_COUNT);
 		ctx.fillRect(x,0,1,20);
@@ -195,7 +275,7 @@ function drawTimeline(pCam) {
 	}
 
 	gArchiveVideoTimeMapping[pCam]=[];
-	ctx.fillStyle = 'red';
+	ctx.fillStyle = '#f7f44f'; // yellow
 	for (var i in gArchiveVideoUrl[pCam]) {
 		var x = Math.floor(i*1080/TIMESTAMPS_COUNT);
 		var dx = Math.ceil(gArchiveVideoLength[pCam][i]*1080/TIMESTAMPS_COUNT);
@@ -205,6 +285,14 @@ function drawTimeline(pCam) {
 			gArchiveVideoTimeMapping[pCam][x]=i;
 		}
 	}
+	ctx.fillStyle = 'orange';
+	for (var i in gArchiveVideoImportance[pCam]) {
+		var x = Math.floor(i*1080/TIMESTAMPS_COUNT);
+		var dx = Math.ceil(gArchiveVideoLength[pCam][i]*1080/TIMESTAMPS_COUNT);
+		var x2 = x + dx;
+		ctx.fillRect(x,0,dx,20);
+	}
+
 }
 
 function idx2time(pIdx) {
@@ -216,18 +304,18 @@ function idx2time(pIdx) {
 
 
 function onTimelineSeek(pCam, pEvent) {
-	if (! gTimelineMouseOverEnabled) return;
 	var cvs = document.getElementById("timeline-"+pCam);
 	if (cvs == null) return;
-
 	var x = pEvent.x - cvs.offsetLeft;
 	var idx1 = Math.floor(x*TIMESTAMPS_COUNT/1080);
 	var idx2 = idx1 + 79; // в 1 пиксел помещается 80 секунд
 	var time = gArchiveDate + " " + idx2time(idx1)+"-"+idx2time(idx2);
-	var divTime = document.getElementById("archiveTime");
-	if (divTime != null) {
-		divTime.innerHTML = '<a class="textButton" onClick="showPrev()">⬅️</a><a class="textButton" onClick="showNext()">➡️</a> ' + time;
+	var divTimeLabel = document.getElementById("archiveTimeLabel");
+	if (divTimeLabel != null) {
+		divTimeLabel.innerHTML = time;
 	}
+	if (!gNeedControl && !gTimelineMouseOverEnabled) return;
+	if (gNeedControl && !pEvent.ctrlKey) return;
 	var ts = gArchivePhotoTimeMapping[pCam][x];
 	// console.log("onTimelineSeek pCam="+pCam+" pEvent.x="+pEvent.x+" cvs.offsetLeft="+cvs.offsetLeft+" x="+x+" idx1="+idx1+" idx2="+idx2+" time="+time+" ts="+ts);
 	showPhoto(pCam, ts);
@@ -235,6 +323,7 @@ function onTimelineSeek(pCam, pEvent) {
 
 
 function showPhoto(pCam, pTimestamp) {
+	setTimelineMark(pTimestamp);
 	var url;
 	if (pTimestamp != undefined) {
 		url = gArchivePhotoUrl[pCam][pTimestamp];
@@ -259,6 +348,7 @@ function showPhoto(pCam, pTimestamp) {
 		gCurrentMode = 'photo';
 		gCurrentCam = pCam;
 		gCurrentTimestamp = pTimestamp;
+		setUrlParams();
 	}
 	// console.log("showPhoto pCam="+pCam+" pTimestamp="+pTimestamp+" url="+url);
 }
@@ -291,6 +381,7 @@ function onTimelineClick(pCam, pEvent) {
 
 	
 function showVideo(pCam, pTimestamp) {
+	setTimelineMark(pTimestamp);
 	var url;
 	url = gArchiveVideoUrl[pCam][pTimestamp];
 	if (url != undefined) {
@@ -299,6 +390,7 @@ function showVideo(pCam, pTimestamp) {
 				
 				imgArchiveVideo.src = url;
 				imgArchiveVideo.style.display = 'block';
+				imgArchiveVideo.playbackRate = gVideoSpeed;
 				imgArchiveVideo.play();
 				gTimelineMouseOverEnabled = false;
 				window.setTimeout('gTimelineMouseOverEnabled = true', 3000);
@@ -311,6 +403,7 @@ function showVideo(pCam, pTimestamp) {
 		gCurrentMode = 'video';
 		gCurrentCam = pCam;
 		gCurrentTimestamp = pTimestamp;
+		setUrlParams();
 	}
 	// console.log("showVideo pCam="+pCam+" pTimestamp="+pTimestamp+" url="+url);
 }
@@ -363,3 +456,91 @@ function showNext() {
 		}
 	}
 }
+
+function toggleCam() {
+	gCurrentCam = getNextCam(gCurrentCam);
+	if (gCurrentMode == 'photo') {
+		showPhoto(gCurrentCam, gCurrentTimestamp);
+	} else if (gCurrentMode == 'video') {
+		showVideo(gCurrentCam, gCurrentTimestamp);
+	}
+}
+
+function toggleVideoSpeed() {
+	switch (gVideoSpeed) {
+		case 1:
+			gVideoSpeed = 4;
+			break;
+		case 4:
+			gVideoSpeed = 8;
+			break;
+		case 8:
+			gVideoSpeed = 1;
+			break;
+		// case 6:
+		// 	gVideoSpeed = 1;
+		// 	break;
+	}
+	var imgArchiveVideo = document.getElementById("archiveVideo");
+	if (imgArchiveVideo != null) {
+		imgArchiveVideo.playbackRate = gVideoSpeed;
+	}
+
+	var toolButtonSpeed = document.getElementById("toolButtonSpeed");
+	if (toolButtonSpeed != null) {
+		toolButtonSpeed.innerHTML = 'x'+gVideoSpeed;
+	}
+}
+
+function getNextCam(pCam) {
+	var cams = Object.keys(gCamList);
+	for (var i=0; i<cams.length; i++) {
+		if (cams[i]==pCam) {
+			if(i+1 < cams.length) {
+				return cams[i+1];
+			} else {
+				return cams[0];
+			}
+		}
+	}
+	return null;
+}
+
+function toggleControl() {
+	var toolButtonControl = document.getElementById("toolButtonControl");
+
+	if (gNeedControl) {
+		gNeedControl = false;
+		if (toolButtonControl != null) {
+			toolButtonControl.className = "toolButton controlOff";
+		}
+	} else {
+		gNeedControl = true;
+		if (toolButtonControl != null) {
+			toolButtonControl.className = "toolButton controlOn";
+		}
+	}
+}
+
+function setTimelineMark(pTimestamp) {
+	if (pTimestamp == undefined) return;
+
+	var x = Math.floor(pTimestamp*1080/TIMESTAMPS_COUNT);
+	//console.log('pTimestamp='+pTimestamp+' x='+x);
+	var cvs = document.getElementById("timelineMark");
+	if (cvs.getContext) {
+		var ctx = cvs.getContext('2d');
+		ctx.clearRect(0,0,1080,5);
+		ctx.strokeStyle = 'white';
+		ctx.fillStyle = 'red';
+		ctx.beginPath();
+	    ctx.moveTo(x-3, 0);
+	    ctx.lineTo(x+3, 0);
+	    ctx.lineTo(x, 3);
+	    ctx.closePath();
+	    ctx.fill();
+	    ctx.stroke();
+	}
+}
+
+
